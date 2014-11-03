@@ -1,9 +1,12 @@
 #ifndef AGENDASERVICE_H
 #define AGENDASERVICE_H
 
-#include "Storage.h"
 #include <list>
 #include <string>
+#include "Storage.h"
+#include "Meeting.h"
+#include "Date.h"
+#include "AGsocket.h"
 
 class AgendaService {
     public:
@@ -43,8 +46,14 @@ class AgendaService {
                                 std::string newPasswd);
         bool queryUser(std::string userName);   // determine whether the username exists
 
+        // service interface
+        bool updateSocket();
+        void sendListOfMeeting(std::list<Meeting> temp);
+        void HandleClient(void);
     private:
         Storage *storage_;
+        AGsocket agendaServerSocket_;
 };
 
 #endif
+

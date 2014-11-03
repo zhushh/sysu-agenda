@@ -1,21 +1,34 @@
-#include "AgendaService.h"
-#include "Storage.h"
-#include "Meeting.h"
 #include <iostream>
 #include <list>
 #include <algorithm>
 #include <string>
+
+#include "AgendaService.h"
+#include "Storage.h"
+#include "Meeting.h"
+#include "Date.h"
+#include "AGsocket.h"
 using std::list;
 using std::string;
 
 AgendaService::AgendaService() {
-    storage_ = Storage::getInstance();
+    // storage_ = Storage::getInstance();
 }
 AgendaService::~AgendaService() {
+    if (storage_ != NULL)
+        quitAgenda();
+}
+void AgendaService::startAgenda(void) {
+    storage_ = Storage::getInstance();
+    agendaServerSocket_.start(true);
+}
+void AgendaService::quitAgenda(void) {
+    storage_->sync();
     delete storage_;
     storage_ = NULL;
+    agendaServerSocket_.quit();
 }
-// user log in
+
 bool AgendaService::userLogIn(std::string userName, std::string password) {
     list<User> temp = storage_->queryUser([&](const User& user) {
         return (userName == user.getName() && password == user.getPassword());
@@ -26,7 +39,6 @@ bool AgendaService::userLogIn(std::string userName, std::string password) {
         return true;
     }
 }
-// user register
 bool AgendaService::userRegister(std::string userName, std::string password,
                   std::string email, std::string phone) {
     list<User> temp;
@@ -45,7 +57,6 @@ bool AgendaService::userRegister(std::string userName, std::string password,
         return false;
     }
 }
-// delete user
 bool AgendaService::deleteUser(std::string userName, std::string password) {
     int count;
     count = storage_->deleteUser([&](const User& user) {
@@ -149,7 +160,6 @@ bool AgendaService::createMeeting(std::string userName, std::string title,
     storage_->createMeeting(t);
     return true;
 }
-// meeting query by title
 std::list<Meeting> AgendaService::meetingQuery(std::string userName, std::string title) {
     list<Meeting> temp;
     temp = storage_->queryMeeting([&](const Meeting& m) {
@@ -164,7 +174,6 @@ std::list<Meeting> AgendaService::meetingQuery(std::string userName, std::string
     });
     return temp;
 }
-// meeting query by time interval
 std::list<Meeting> AgendaService::meetingQuery(std::string userName, std::string startDate,
                                 std::string endDate) {
     list<Meeting> temp;
@@ -182,7 +191,6 @@ std::list<Meeting> AgendaService::meetingQuery(std::string userName, std::string
     });
     return temp;
 }
-// list all meetings
 std::list<Meeting> AgendaService::listAllMeetings(std::string userName) {
     list<Meeting> temp;
     temp = storage_->queryMeeting([&](const Meeting& m) {
@@ -194,7 +202,6 @@ std::list<Meeting> AgendaService::listAllMeetings(std::string userName) {
     });
     return temp;
 }
-// list all sponsor meetings
 std::list<Meeting> AgendaService::listAllSponsorMeetings(std::string userName) {
     list<Meeting> temp;
     temp = storage_->queryMeeting([&](const Meeting& m) {
@@ -206,7 +213,6 @@ std::list<Meeting> AgendaService::listAllSponsorMeetings(std::string userName) {
     });
     return temp;
 }
-// list all participartor meetings
 std::list<Meeting> AgendaService::listAllParticipateMeetings(std::string userName) {
     list<Meeting> temp;
     temp = storage_->queryMeeting([&](const Meeting& m) {
@@ -218,7 +224,6 @@ std::list<Meeting> AgendaService::listAllParticipateMeetings(std::string userNam
     });
     return temp;
 }
-// delete meeting by title
 bool AgendaService::deleteMeeting(std::string userName, std::string title) {
     int temp;
     temp = storage_->deleteMeeting([&](const Meeting& m) {
@@ -234,7 +239,6 @@ bool AgendaService::deleteMeeting(std::string userName, std::string title) {
         return false;
     }
 }
-// delete all meetings
 bool AgendaService::deleteAllMeetings(std::string userName) {
     int temp;
     temp = storage_->deleteMeeting([&](const Meeting& m) {
@@ -250,15 +254,9 @@ bool AgendaService::deleteAllMeetings(std::string userName) {
         return false;
     }
 }
-void AgendaService::startAgenda(void) {
-    storage_ = Storage::getInstance();
-}
-void AgendaService::quitAgenda(void) {
-    storage_->sync();
-}
 
-// extention function
-// change meeting start time
+// addition function
+// change meeting time
 bool AgendaService::changeStartTime(std::string userName, std::string title,
                      std::string newTime) {
     list<Meeting> m = storage_->queryMeeting([&](const Meeting& m) {
@@ -297,7 +295,6 @@ bool AgendaService::changeStartTime(std::string userName, std::string title,
         return false;
     }
 }
-// change meeting end time
 bool AgendaService::changeEndTime(std::string userName, std::string title,
                    std::string newTime) {
     list<Meeting> m = storage_->queryMeeting([&](const Meeting& m) {
@@ -336,7 +333,6 @@ bool AgendaService::changeEndTime(std::string userName, std::string title,
         return false;
     }
 }
-// change meeting time
 bool AgendaService::changeMeetingTime(std::string userName, std::string title,
                        std::string newStartTime, std::string newEndTime) {
     // check that the userName is sponsor
@@ -419,5 +415,161 @@ bool AgendaService::queryUser(std::string userName) {
         return false;
     } else {
         return true;
+    }
+}
+
+
+// provide the service for client
+bool AgendaService::updateSocket() {
+    if (storage_ != NULL) {
+        storage_->sync();
+    }
+    return agendaServerSocket_.update();
+}
+void AgendaService::sendListOfMeeting(std::list<Meeting> temp) {
+    for (auto itr = temp.begin(); itr != temp.end(); itr++) {
+        agendaServerSocket_.sendSTR(itr->getSponsor());
+        if (agendaServerSocket_.recvSTR() == "OK")
+            agendaServerSocket_.sendSTR(itr->getParticipator());
+        if (agendaServerSocket_.recvSTR() == "OK")
+            agendaServerSocket_.sendSTR(Date::dateToString(itr->getStartDate()));
+        if (agendaServerSocket_.recvSTR() == "OK")
+            agendaServerSocket_.sendSTR(Date::dateToString(itr->getEndDate()));
+        if (agendaServerSocket_.recvSTR() == "OK")
+            agendaServerSocket_.sendSTR(itr->getTitle());
+        if (agendaServerSocket_.recvSTR() == "OK")
+            continue;
+    }
+    agendaServerSocket_.sendSTR("OK");   // send for telling the client the ending
+}
+void AgendaService::HandleClient() {
+    std::string Operator = "";
+    std::string userName, userPassword, email, phone;
+    std::string title, participator, start_time, end_time;
+
+    while ((Operator = agendaServerSocket_.recvSTR()) != "") {
+        agendaServerSocket_.sendSTR("OK");
+        if (Operator == "dc") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            userPassword = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+
+            if (agendaServerSocket_.recvSTR() == "OK" && deleteUser(userName, userPassword)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "lu") {
+            list<User> temp = listAllUsers();
+            for (auto itr = temp.begin(); itr != temp.end(); itr++) {
+                agendaServerSocket_.sendSTR(itr->getName());
+                if (agendaServerSocket_.recvSTR() == "OK")
+                    agendaServerSocket_.sendSTR(itr->getEmail());
+                if (agendaServerSocket_.recvSTR() == "OK")
+                    agendaServerSocket_.sendSTR(itr->getPhone());
+            }
+            agendaServerSocket_.sendSTR("OK");
+        } else if (Operator == "cm") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            title = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            participator = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            start_time = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            end_time = agendaServerSocket_.recvSTR();
+
+            if (agendaServerSocket_.recvSTR() == "OK" && 
+                createMeeting(userName, title, participator, start_time, end_time)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "la") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                sendListOfMeeting(listAllMeetings(userName));
+        } else if (Operator == "las") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                sendListOfMeeting(listAllSponsorMeetings(userName));
+        } else if (Operator == "lap") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                sendListOfMeeting(listAllParticipateMeetings(userName));
+        } else if (Operator == "qm") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            title = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                sendListOfMeeting(meetingQuery(userName, title));
+        } else if (Operator == "qt") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            start_time = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            end_time = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                sendListOfMeeting(meetingQuery(userName, start_time, end_time));
+        } else if (Operator == "dm") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            title = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+
+            if (agendaServerSocket_.recvSTR() == "OK" &&
+                         deleteMeeting(userName, title)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "da") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK" &&
+                         deleteAllMeetings(userName)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "l" || Operator == "login") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            userPassword = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK" &&
+                 userLogIn(userName, userPassword)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "r" || Operator == "register") {
+            userName = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            userPassword = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            email = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            phone = agendaServerSocket_.recvSTR();
+            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK" &&
+                userRegister(userName, userPassword, email, phone)) {
+                agendaServerSocket_.sendSTR("true");
+            } else {
+                agendaServerSocket_.sendSTR("false");
+            }
+        } else if (Operator == "q" || Operator == "quit") {
+            break;      // exit while
+        } else {
+            std::cout << "get undefined operator from user\n";
+            agendaServerSocket_.sendSTR("false");
+        }
     }
 }

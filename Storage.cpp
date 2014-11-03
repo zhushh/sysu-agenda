@@ -1,4 +1,3 @@
-#include "Storage.h"
 #include <list>
 #include <string>
 #include <functional>
@@ -8,6 +7,7 @@
 #include <fstream>
 #include <cstdlib>
 
+#include "Storage.h"
 #include "User.h"
 #include "Meeting.h"
 using std::list;

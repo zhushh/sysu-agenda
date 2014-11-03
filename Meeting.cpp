@@ -42,3 +42,4 @@ std::string Meeting::getTitle(void) const {
 void Meeting::setTitle(std::string title) {
     title_ = title;
 }
+

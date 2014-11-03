@@ -1,9 +1,17 @@
 #ifndef AGENDAUI_H
 #define AGENDAUI_H
 
-#include "AgendaService.h"
 #include <iostream>
 #include <string>
+#include <list>
+
+#ifdef AGENDASERVICE
+#include "AgendaService.h"
+#endif
+
+#include "Meeting.h"
+#include "Date.h"
+#include "AGsocket.h"
 
 class AgendaUI {
     public:
@@ -13,7 +21,7 @@ class AgendaUI {
     private:
         // task functions
         void startAgenda(void);
-        std::string getOperation();
+        std::string getOperation(void);
         bool executeOperation(std::string op);
         void userLogIn(void);
         void userRegister(void);
@@ -31,6 +39,9 @@ class AgendaUI {
         void deleteAllMeetings(void);
         void printMeetings(std::list<Meeting> meetings);
 
+        std::list<Meeting> getMeetings(void);
+        bool updateSocket(void);
+/*
         // change meeting time
         void changeStartTime(void);
         void changeEndTime(void);
@@ -38,12 +49,15 @@ class AgendaUI {
         // void changUserName(void);
         // void sendEmail(void);
         void changeUserPassword(void);
-
+        void printHistory(void);
+*/
         // dates
         std::string userName_;
         std::string userPassword_;
-        AgendaService agendaService_;
+        // AgendaService agendaService_;
         std::string readString(std::string);  // read non-empty string
+        AGsocket agendaSocket_;
 };
 
 #endif
+
