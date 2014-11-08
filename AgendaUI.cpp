@@ -232,6 +232,7 @@ void AgendaUI::listAllUsers(void) {
          << std::setw(20) << "Name"
          << std::setw(20) << "Email"
          << std::setw(20) << "Phone" << endl;
+    agendaSocket_.sendSTR("OK");
     for (size_t count = 1; "OK" != (result = agendaSocket_.recvSTR()); count++) {
         cout << std::left << setw(20) << result;
         if (count % 3 == 0) cout << endl;
@@ -254,7 +255,9 @@ void AgendaUI::createMeeting(void) {
                 cin.ignore();
                 if (ch == 'y' || ch == 'Y') {
                     cout << "[create meeting]: create meeting withdraw!" << endl;
-                    return;
+                    agendaSocket_.sendSTR("q");
+                    if (agendaSocket_.recvSTR() == "OK")
+                        return;
                 } else if (ch == 'n' || ch == 'N') {
                     cout << "create meeting continue ..." << endl;
                     info[i] = readString(prompt[i]);
@@ -269,11 +272,17 @@ void AgendaUI::createMeeting(void) {
     // send username, title, participator, start time and end time
     agendaSocket_.sendSTR(userName_);
     for (size_t i = 0; i < 4; i++) {
-        if (agendaSocket_.recvSTR() == "OK")
+        if (agendaSocket_.recvSTR() == "OK") {
             agendaSocket_.sendSTR(info[i]);
+            cout << "send OK" << endl;
+        }
     }
-    agendaSocket_.sendSTR("OK");
-    if ("true" == agendaSocket_.recvSTR()) {
+    if (agendaSocket_.recvSTR() == "OK")
+        agendaSocket_.sendSTR("OK");
+    cout << "send finished" << endl;
+    if (agendaSocket_.recvSTR() == "OK")
+        agendaSocket_.sendSTR("OK");
+    if (agendaSocket_.recvSTR() == "true") {
         cout << "[create meeting] succeed!" << endl;
     } else {
         cout << "[error] create meeting fail!" << endl;
@@ -293,17 +302,14 @@ list<Meeting> AgendaUI::getMeetings() {
         Meeting data;
         data.setSponsor(result);
         agendaSocket_.sendSTR("OK");
-        result = agendaSocket_.recvSTR();
-        data.setParticipator(result);
+        data.setParticipator(agendaSocket_.recvSTR());
         agendaSocket_.sendSTR("OK");
-        result = agendaSocket_.recvSTR();
-        data.setStartDate(Date::stringToDate(result));
+        data.setStartDate(Date::stringToDate(agendaSocket_.recvSTR()));
         agendaSocket_.sendSTR("OK");
-        result = agendaSocket_.recvSTR();
-        data.setEndDate(Date::stringToDate(result));
+        data.setEndDate(Date::stringToDate(agendaSocket_.recvSTR()));
         agendaSocket_.sendSTR("OK");
-
-        data.setTitle(result);
+        data.setTitle(agendaSocket_.recvSTR());
+        agendaSocket_.sendSTR("OK");
         temp.push_back(data);
     }
     return temp;

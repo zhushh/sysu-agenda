@@ -66,15 +66,32 @@ bool Date::isValid(Date date) {
         }
     }
 }
+
 Date Date::stringToDate(std::string date) {
     Date temp;
+    int i = 0, d = -2;
     int year, month, day, hour, minute;
-    year = (date[0] - '0') * 1000 + (date[1] - '0') * 100;
-    year = year + (date[2] - '0') * 10 + (date[3] - '0');
-    month = (date[5] - '0') * 10 + (date[6] - '0');
-    day = (date[8] - '0') * 10 + (date[9] - '0');
-    hour = (date[11] - '0') * 10 + (date[12] - '0');
-    minute = (date[14] - '0') * 10 + (date[15] - '0');
+    year = month = day = hour = minute = 0;
+    while (i < date.size()) {
+        if (date[i] == '-' && d == -2) {
+            d++; i++; continue;
+        }
+        if (date[i] == '-' && d == -1) {
+            d++; i++; continue;
+        }
+        if (date[i] == '/' && d == 0) {
+            d++; i++; continue;
+        }
+        if (date[i] == ':' && d == 1) {
+            d++; i++; continue;
+        }
+        if (d == -2) year = year * 10 + (date[i] - '0');
+        if (d == -1) month = month * 10 + (date[i] - '0');
+        if (d == 0) day = day * 10 + (date[i] - '0');
+        if (d == 1) hour = hour * 10 + (date[i] - '0');
+        if (d == 2) minute = minute * 10 + (date[i] - '0');
+        i++;
+    }
     temp.setYear(year);
     temp.setMonth(month);
     temp.setDay(day);
@@ -84,6 +101,10 @@ Date Date::stringToDate(std::string date) {
 }
 std::string Date::dateToString(Date date) {
     std::string dateString;
+    if (!isValid(date)) {
+        dateString = "0000-00-00/00:00";
+        return dateString;
+    }
     char str[17];
     int num;
     num = date.getYear();    // convert year

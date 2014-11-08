@@ -10,6 +10,8 @@
 #include "AGsocket.h"
 using std::list;
 using std::string;
+using std::cout;
+using std::endl;
 
 AgendaService::AgendaService() {
     // storage_ = Storage::getInstance();
@@ -103,6 +105,7 @@ bool AgendaService::createMeeting(std::string userName, std::string title,
     if (userName == participator) {
         return false;
     }
+
     // check that user has registered
     if ((storage_->queryUser([userName](const User& u) {
         if (userName == u.getName()) {
@@ -133,6 +136,7 @@ bool AgendaService::createMeeting(std::string userName, std::string title,
     }).empty())) {
         return false;
     }
+
     // check that user and participator are all spare
     Meeting t(userName, participator, d1, d2, title);
     list<Meeting> sp = listAllMeetings(userName);
@@ -426,6 +430,7 @@ bool AgendaService::updateSocket() {
     }
     return agendaServerSocket_.update();
 }
+
 void AgendaService::sendListOfMeeting(std::list<Meeting> temp) {
     for (auto itr = temp.begin(); itr != temp.end(); itr++) {
         agendaServerSocket_.sendSTR(itr->getSponsor());
@@ -449,7 +454,10 @@ void AgendaService::HandleClient() {
 
     while ((Operator = agendaServerSocket_.recvSTR()) != "") {
         agendaServerSocket_.sendSTR("OK");
-        if (Operator == "dc") {
+//        cout << "Operator == " << Operator << endl;
+        if (Operator == "o") {
+            cout << "user logout" << endl;
+        } else if (Operator == "dc") {
             userName = agendaServerSocket_.recvSTR();
             agendaServerSocket_.sendSTR("OK");
             userPassword = agendaServerSocket_.recvSTR();
@@ -463,26 +471,35 @@ void AgendaService::HandleClient() {
         } else if (Operator == "lu") {
             list<User> temp = listAllUsers();
             for (auto itr = temp.begin(); itr != temp.end(); itr++) {
-                agendaServerSocket_.sendSTR(itr->getName());
+                if (agendaServerSocket_.recvSTR() == "OK")
+                    agendaServerSocket_.sendSTR(itr->getName());
                 if (agendaServerSocket_.recvSTR() == "OK")
                     agendaServerSocket_.sendSTR(itr->getEmail());
                 if (agendaServerSocket_.recvSTR() == "OK")
                     agendaServerSocket_.sendSTR(itr->getPhone());
             }
-            agendaServerSocket_.sendSTR("OK");
+            if (agendaServerSocket_.recvSTR() == "OK")
+                agendaServerSocket_.sendSTR("OK");
         } else if (Operator == "cm") {
-            userName = agendaServerSocket_.recvSTR();
+            string receive[6];
+            int i = 0;
+            while ((receive[i] = agendaServerSocket_.recvSTR()) != "OK") {
+                agendaServerSocket_.sendSTR("OK");
+                if (receive[i] == "q") {
+                    cout << "creating meeting withdraw" << endl;
+                    break;
+                }
+                i++;
+            }
+            if (receive[i] == "q") {
+                continue;
+            }
+            // cout << "OK, continue!" << endl;
             agendaServerSocket_.sendSTR("OK");
-            title = agendaServerSocket_.recvSTR();
-            agendaServerSocket_.sendSTR("OK");
-            participator = agendaServerSocket_.recvSTR();
-            agendaServerSocket_.sendSTR("OK");
-            start_time = agendaServerSocket_.recvSTR();
-            agendaServerSocket_.sendSTR("OK");
-            end_time = agendaServerSocket_.recvSTR();
-
-            if (agendaServerSocket_.recvSTR() == "OK" && 
-                createMeeting(userName, title, participator, start_time, end_time)) {
+            if (agendaServerSocket_.recvSTR() == "OK")
+                cout << "receive finished" << endl;
+            // for (i = 0; i < 6; i++) cout << receive[i] << endl;
+            if (createMeeting(receive[0], receive[1], receive[2], receive[3], receive[4])) {
                 agendaServerSocket_.sendSTR("true");
             } else {
                 agendaServerSocket_.sendSTR("false");
@@ -565,11 +582,13 @@ void AgendaService::HandleClient() {
             } else {
                 agendaServerSocket_.sendSTR("false");
             }
+        } else if (Operator == "h" || Operator == "help") {
+            cout << "print help for user" << endl;
         } else if (Operator == "q" || Operator == "quit") {
             break;      // exit while
         } else {
             std::cout << "get undefined operator from user\n";
-            agendaServerSocket_.sendSTR("false");
+            // agendaServerSocket_.sendSTR("false");
         }
     }
 }
