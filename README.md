@@ -2,7 +2,7 @@ sysu-agenda
 ===========
 
 ##说明
-project主要包含headers，src,bin,temp文件夹;其中headers用来存放头文件,src用来存放头文件的定义,bin目录保存生成的可执行文件,
+project主要包含headers，src,bin,temp文件夹;其中headers用来存放头文件,src用来存放头文件的定义,bin目录保存生成的可执行文件以及保存数据的两个文件user.csv和meeting.csv,
 temp目录存放的是一些自己进行阶段测试的代码拷贝;
 
 ##下载
